@@ -11,5 +11,6 @@ Nontrivial functionalities:
 - input-output functionalities ( cin, cout)
 - simulating calculus errors
 - interrupting program functionality (break)
+
 *to be edited later*
 
