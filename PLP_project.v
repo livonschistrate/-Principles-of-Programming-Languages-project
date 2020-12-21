@@ -374,15 +374,15 @@ Inductive VExp :=
 | vector_bool : Var -> bool -> list bool -> VExp
 | vecotr_str : Var -> string -> list string -> VExp.
 
-Notation "[ ]" := nil (format "[ ]") : list_scope.
-Notation "[ nr ]" := (cons nr nil) : list_scope.
-Notation "{ n1 , n2 , .. , nn }" := (cons n1 (cons n2 .. (cons nn nil) ..)) : list_scope.
+Notation "a '[' n ']' ":=(vector_int a n) (at level 50).
+Notation "a '|' n '|' ":=(vector_bool a n) (at level 50).
+(* Notation "a '/' n '\' ":=(vector_str a n) (at level 50). *)
 
 (* flow controls + assignment + sequence *)
 Inductive Stmt :=
-| decl_equals_Z : Var -> Stmt -> AExp -> Stmt
-| decl_equals_bool : Var -> Stmt -> BExp -> Stmt
-| decl_equals_string : Var -> Stmt -> StExp -> Stmt
+| decl_equals_Z : Var -> AExp -> Stmt
+| decl_equals_bool : Var -> BExp -> Stmt
+| decl_equals_string : Var -> StExp -> Stmt
 | decl_equals_vectZ : Var -> Stmt -> VExp -> Stmt
 | decl_equals_vectbool : Var -> Stmt -> VExp -> Stmt
 | decl_equals_vectstring : Var -> Stmt -> VExp -> Stmt
