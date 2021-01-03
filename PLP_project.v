@@ -1,8 +1,7 @@
 (* string requirements *)
 Require Import Strings.String.
+Local Open Scope string_scope.
 Scheme Equality for string.
-Open Scope string_scope.
-Require Export Coq.Strings.String.
 
 (* integral requirements *)
 Require Import Coq.ZArith.BinInt.
@@ -15,24 +14,19 @@ Local Open Scope list_scope.
 Inductive ErrorZ :=
 | error_Z : ErrorZ
 | number : Z -> ErrorZ.
-
 Coercion number : Z >-> ErrorZ.
 
 Inductive ErrorBool :=
 | error_bool : ErrorBool
 | boolean : bool -> ErrorBool.
-
 Coercion boolean : bool >-> ErrorBool.
 
 Inductive ErrorString :=
 | error_string : ErrorString
 | vstring : string -> ErrorString.
-
 Coercion vstring : string >-> ErrorString.
 
-Definition Var := string.
-
-Inductive realVar : Type :=
+Inductive realVar :=
 | var_notdecl : realVar
 | undecl_noob : realVar
 | error_equal : realVar
@@ -43,17 +37,64 @@ Inductive realVar : Type :=
 
 Scheme Equality for realVar.
 
-Definition Env := Var -> realVar.
-Definition env_undecl : Env :=
-    fun v => undecl_noob.
+Definition Env := string -> realVar.
+Definition env_notdecl : Env :=
+    fun v => var_notdecl.
 
-Definition update (env : Env) (v : string) (value : realVar) : Env :=
-  fun x => if (eqb x v) then value else env x.
+Definition CheckVar (a : realVar) (b : realVar) : bool :=
+  match a with
+  | var_notdecl => match b with
+                   | var_notdecl => true
+                   | _ => false
+                   end
+  | undecl_noob => match b with
+                   | undecl_noob => true
+                   | _ => false
+                   end
+  | error_equal => match b with
+                   | error_equal => true
+                   | _ => false
+                   end
+  | numbr_e n1 => match b with
+                   | numbr_e n2 => true
+                   | _ => false
+                   end
+  | troof_e b1 => match b with
+                   | troof_e b2 => true
+                   | _ => false
+                   end
+  | strng_e s1 => match b with
+                   | strng_e s2 => true
+                   | _ => false
+                   end
+  | default => match b with
+                   | default => true
+                   | _ => false
+                   end
+end.
+
+Definition update (env : Env) (s : string) (x : realVar) : Env :=
+  fun y => if (eqb y s)
+              then 
+              if (andb (CheckVar (var_notdecl) (env y)) (negb(CheckVar (default) (x))))
+              then var_notdecl
+              else
+                if (andb (CheckVar (var_notdecl) (env y)) (CheckVar (default) (x)))
+                then default
+                else
+                  if (orb (CheckVar (default) (env y)) (CheckVar (x) (env y)))
+                  then x
+                  else error_equal
+            else env y.
+
+
+(* Definition update (env : Env) (v : string) (value : realVar) : Env :=
+  fun x => if (eqb x v) then value else env x. *)
 
 Inductive AExp :=
 (* arithmetic expressions *)
 | aconstant : ErrorZ -> AExp
-| aident : Var -> AExp
+| aident : string -> AExp
 | plus : AExp -> AExp -> AExp
 | minus : AExp -> AExp -> AExp
 | multiply : AExp -> AExp -> AExp
@@ -66,19 +107,33 @@ Inductive AExp :=
 | swap : AExp -> AExp -> AExp.
 
 Coercion aconstant : ErrorZ >-> AExp.
-Coercion aident : Var >-> AExp.
+Coercion aident : string >-> AExp.
 
 (* notations for arithmetic expressions*)
 Notation "'SUM' 'OF' a 'AN' b" := (plus a b) (at level 48).
 Notation "'DIFF' 'OF' a 'AN' b" := (minus a b) (at level 48).
+
 Notation "'PRODUKT' 'OF' a 'AN' b" := (multiply a b) (at level 46).
+
 Notation "'QUOSHUNT' 'OF' a 'AN' b" := (divide a b) (at level 46).
+
 Notation "'MOD' 'OF' a 'AN' b" := (modulo a b) (at level 46).
+
 Notation "'BIGGR' 'OF' a 'AN' b" := (maximum a b) (at level 49).
+
 Notation "'SMALLR' 'OF' a 'AN' b" := (minimum a b) (at level 49).
+
 Notation "'BUFF' n" := (increment n) (at level 48).
+
 Notation "'NERF' n" := (decrement n) (at level 48).
+
 Notation "'FWAP' a 'WIT' b" := (swap a b) (at level 48).
+
+Check (SUM OF 3 AN 4).
+Check (DIFF OF "a" AN 2).
+Check (BUFF 15).
+Check (NERF "i").
+
 
 (* simulating arithmetic calculus errors *)
 Definition plus_err (n1 n2 : ErrorZ) : ErrorZ :=
@@ -158,81 +213,123 @@ Definition min_err (n1 n2 : ErrorZ) : ErrorZ :=
   end. *)
 
 (* classic semantics for arithmetic expressions - in works *)
-(* Fixpoint afunct (a : AExp) (env : Env) : Z :=
+(* Fixpoint afunct (a : AExp) (env : Env) : ErrorZ :=
   match a with
-  | aident id => (env id)
+  | aident aid => match (env aid) with
+                 | numbr_e n => n
+                 | _ => error_Z
+                 end
   | aconstant n => n
-  | plus a1 a2 => (afunct a1 env) + (afunct a2 env)
-  | minus a1 a2 => (afunct a1 env) - (afunct a2 env)
-  | multiply a1 a2 => (afunct a1 env) * (afunct a2 env)
-  | divide a1 a2 => Z.div (afunct a1 env) (afunct a2 env)
-  | modulo a1 a2 => Z.modulo (afunct a1 env) (afunct a2 env)
-  | increment bf => (afunct bf env) + 1
-  | decrement nf => (afunct nf env) - 1
-  | maximum m1 m2 => if Z.leb (afunct m1 env) (afunct m2 env)
-                     then (afunct m2 env) else (afunct m1 env)
-  | minimum m1 m2 => if Z.leb (afunct m1 env) (afunct m2 env)
-                     then (afunct m1 env) else (afunct m2 env)
+  | plus a1 a2 => plus_err(afunct a1 env) (afunct a2 env)
+  | minus a1 a2 => minus_err(afunct a1 env) (afunct a2 env)
+  | multiply a1 a2 => multiply_err(afunct a1 env) (afunct a2 env)
+  | divide a1 a2 => divide_err(afunct a1 env) (afunct a2 env)
+  | modulo a1 a2 => modulo_err (afunct a1 env) (afunct a2 env)
+  | increment bf => incr_err (afunct bf env)
+  | decrement nf => decr_err (afunct nf env)
+  | maximum m1 m2 => max_err (afunct m1 env) (afunct m2 env)
+                     
+  | minimum m1 m2 => min_err (afunct m1 env) (afunct m2 env)
+                    
   end. *)
 
 (* Big-Step semantics for arithmetic expressions - in works *)
 Reserved Notation "A =[ S ]=> N" (at level 60).
-(*Inductive aritBS : AExp -> Env -> ErrorZ -> Prop :=
+Inductive aritBS : AExp -> Env -> ErrorZ -> Prop :=
 | constantBS : forall n sg, aconstant n =[ sg ]=> n
-| identBS : forall id sg, aident id =[ sg ]=> (sg id)
+| identBS : forall aid sg, aident aid =[ sg ]=> match (sg aid) with
+                                              | numbr_e aid => aid
+                                              | _ => 0
+                                              end
 | plusBS : forall a1 a2 i1 i2 sg n,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    n = i1 + i2 ->
+    n = plus_err i1 i2 ->
     plus a1 a2 =[ sg ]=> n
 | minusBS : forall a1 a2 i1 i2 sg n,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    n = i1 - i2 ->
+    n = minus_err i1 i2 ->
     minus a1 a2 =[ sg ]=> n
 | multBS : forall a1 a2 i1 i2 sg n,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    n = i1 * i2 ->
+    n = multiply_err i1 i2 ->
     multiply a1 a2 =[ sg ]=> n
 | divBS : forall a1 a2 i1 i2 sg n,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    i2 > 0 ->
-    n = Z.div i1 i2 ->
+    n = divide_err i1 i2 ->
     divide a1 a2 =[ sg ]=> n
 | modBS : forall a1 a2 i1 i2 sg n,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    i2 > 0 ->
-    n = Z.modulo i1 i2 ->
+    n = modulo_err i1 i2 ->
     modulo a1 a2 =[ sg ]=> n
 | incrBS : forall a i sg n,
     a =[ sg ]=> i ->
-    n = i + 1 ->
+    n = incr_err i ->
     increment a =[ sg ]=> n
 | decrBS : forall a i sg n,
     a =[ sg ]=> i ->
-    n = i - 1 ->
+    n = decr_err i ->
     decrement a =[ sg ]=> n
-(* | maxBS : forall a1 a2 i1 i2 sg n b,
+| maxBS : forall a1 a2 i1 i2 sg b,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    b = if Nat.leb i1 i2 
-        then i2 else i1 ->
+    b = max_err i1 i2 ->
     maximum a1 a2 =[ sg ]=> b
-| minBS : forall a1 a2 i1 i2 sg n,
+| minBS : forall a1 a2 i1 i2 sg b,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    minimum a1 a2 =[ sg ]=> if Nat.leb i1 i2 
-                            then i1 else i2  *)
-where "a =[ sg ]=> n" := (aritBS a sg n). *)
+    b = min_err i1 i2 ->
+    minimum a1 a2 =[ sg ]=> b
+where "a =[ sg ]=> n" := (aritBS a sg n).
+
+(* string expressions *)
+Inductive StExp :=
+| sconstant : ErrorString -> StExp
+| sident : string -> StExp
+| sconcat : StExp -> StExp -> StExp
+| slen : StExp -> StExp -> StExp.
+
+Coercion sconstant : ErrorString >-> StExp.
+Coercion sident : string >-> StExp.
+
+(* Notation "'COMP' a 'WIT' b" := (scomp a b)(at level 50). *)
+(* Notation "'CONCAT' a 'WIT' b" := (sconcat a b) (at level 50). *)
+
+(* Check length("long"). *)
+
+Definition err_cat (s1 s2 : ErrorString) : ErrorString :=
+  match s1, s2 with
+  | error_string, _ => error_string
+  | _, error_string => error_string
+  | vstring s1, vstring s2 => vstring (s1 ++ s2)
+  end. 
+
+(* Definition err_len (s : ErrorString) := 
+  match s with
+  | nostring => Z0
+  | estring c s' => 1 + lenh s'
+  end. *)
+
+(* Definition comp_err (s1 s2 : ErrorString) : ErrorZ :=
+  match s1, s2 with
+  | error_string, _ => error_Z
+  | _, error_string => error_Z
+  | vstring s1 , vstring s2 => if boolean (Z.ltb (length(s1) length(s2)))
+                       then -1
+                       else if boolean (Z.eq (length(s1) length(s2)))
+                            then 0
+                            else 1
+  end.
+ *)
 
 (* boolean expressions *)
 Inductive BExp :=
-| berror : BExp
-| bconst : ErrorBool -> BExp
-| bident : Var -> BExp
+| bconstant : ErrorBool -> BExp
+| bident : string -> BExp
 | right : BExp
 | wrong : BExp
 | non : BExp -> BExp
@@ -244,10 +341,11 @@ Inductive BExp :=
 | lt : AExp -> AExp -> BExp
 | gt : AExp -> AExp -> BExp
 | leq : AExp -> AExp -> BExp
-| geq : AExp -> AExp -> BExp.
+| geq : AExp -> AExp -> BExp
+| scomp : StExp -> StExp -> BExp.
 
-Coercion bconst : ErrorBool >-> BExp.
-Coercion bident : Var >-> BExp. 
+Coercion bconstant : ErrorBool >-> BExp.
+Coercion bident : string >-> BExp. 
 
 (* notations for boolean expressions *)
 Notation "'BOTH' 'OF' a 'AN' b" := (and a b) (at level 60).
@@ -260,6 +358,9 @@ Notation "'DIFFRINT' 'AN' 'BIGGR' 'OF' a 'AN' b" := (lt a b) (at level 53).
 Notation "'DIFFRINT' 'AN' 'SMALLR' 'OF' a 'AN' b" := (gt a b) (at level 53).
 Notation "'BOTH' 'SAEM' 'AN' 'BIGGR' 'OF' a 'AN' b" := (geq a b) (at level 53).
 Notation "'BOTH' 'SAEM' 'AN' 'SMALLR' 'OF' a 'AN' b" := (leq a b) (at level 53).
+
+Check (NOT "x").
+Check (BOTH SAEM "a" AN BIGGR OF "a" AN "b").
 
 Definition non_err (n : ErrorBool) : ErrorBool :=
   match n with
@@ -295,99 +396,151 @@ Definition same_err (n1 n2 : ErrorZ) : ErrorBool :=
   | number n1 , number n2 => boolean (Z.eqb n1 n2)
   end.
 
+Definition diff_err (n1 n2 : ErrorZ) : ErrorBool :=
+  match n1, n2 with
+  | error_Z, _ => error_bool
+  | _, error_Z => error_bool
+  | number n1 , number n2 => boolean (negb(Z.eqb n1 n2))
+  end.
+
 Definition lt_err (n1 n2 : ErrorZ) : ErrorBool :=
+  match n1, n2 with
+  | error_Z, _ => error_bool
+  | _, error_Z => error_bool
+  | number n1 , number n2 => boolean (Z.ltb n1 n2)
+  end.
+
+Definition gt_err (n1 n2 : ErrorZ) : ErrorBool :=
+  match n1, n2 with
+  | error_Z, _ => error_bool
+  | _, error_Z => error_bool
+  | number n1 , number n2 => boolean (Z.ltb n2 n1)
+  end.
+
+Definition leq_err (n1 n2 : ErrorZ) : ErrorBool :=
   match n1, n2 with
   | error_Z, _ => error_bool
   | _, error_Z => error_bool
   | number n1 , number n2 => boolean (Z.leb n1 n2)
   end.
 
+Definition geq_err (n1 n2 : ErrorZ) : ErrorBool :=
+  match n1, n2 with
+  | error_Z, _ => error_bool
+  | _, error_Z => error_bool
+  | number n1 , number n2 => boolean (Z.leb n2 n1)
+  end.
+
+(* Definition scmp (s1 s2 : ErrorString) : ErrorString :=
+  fun  *)
+
+
 (* Big-Step semantics for boolean expressions - in works *)
-(* Reserved Notation "B ={ S }=> B'" (at level 70).
-Inductive boolBS : BExp -> Env -> BExp -> Prop :=
+Reserved Notation "B ={ S }=> B'" (at level 70).
+Inductive boolBS : BExp -> Env -> ErrorBool -> Prop :=
 | itz_tru : forall sg, right ={ sg }=> true
 | itz_fls : forall sg, wrong ={ sg }=> false
-| ttof : forall b sg,
+| bconstantBS : forall b sg, bconstant b ={ sg }=> b
+| bidentBS : forall bid sg, bident bid ={ sg }=> match (sg bid) with
+                                              | troof_e bid => bid
+                                              | _ => false
+                                              end
+(* | ttof : forall b sg,
     b ={ sg }=> true ->
     non b ={ sg }=> false 
 | ftot : forall b sg,
     b ={ sg }=> false ->
-    non b ={ sg }=> true
-| tand : forall b1 b2 sg r,
+    non b ={ sg }=> true *)
+| notBS : forall sg b b' i1,
+    b ={ sg }=> i1 ->
+    b' = (non_err i1) ->
+    (non b) ={ sg }=> b'
+(* | tand : forall b1 b2 sg r,
     b1 ={ sg }=> true ->
     b2 ={ sg }=> r ->
     and b1 b2 ={ sg }=> r
 | fand : forall b1 b2 sg,
     b1 ={ sg }=> false ->
-    and b1 b2 ={ sg }=> false
-| tor : forall b1 b2 sg,
+    and b1 b2 ={ sg }=> false *)
+| andBS : forall sg b1 b2 i1 i2 b,
+    b1 ={ sg }=> i1 ->
+    b2 ={ sg }=> i2 ->
+    b = (and_err i1 i2) ->
+    and b1 b2 ={ sg }=> b
+(* | tor : forall b1 b2 sg,
     b1 ={ sg }=> true ->
     or b1 b2 ={ sg }=> true
 | wfor : forall b1 b2 sg r,
     b1 ={ sg }=> false ->
     b2 ={ sg }=> r ->
-    or b1 b2 ={ sg }=> r
-| fxor : forall b1 b2 sg r,
+    or b1 b2 ={ sg }=> r *)
+| orBS : forall sg b1 b2 i1 i2 b,
+    b1 ={ sg }=> i1 ->
+    b2 ={ sg }=> i2 ->
+    b = (or_err i1 i2) ->
+    or b1 b2 ={ sg }=> b
+(* | fxor : forall b1 b2 sg r,
     b1 ={ sg }=> r ->
     b2 ={ sg }=> r ->
     xor b1 b2 ={ sg }=> false
 | txor : forall b1 b2 sg r1 r2,
     b1 ={ sg }=> r1 ->
     b2 ={ sg }=> r2 ->
-    xor b1 b2 ={ sg }=> true 
-| lessthan : forall a1 a2 i1 i2 sg r,
+    xor b1 b2 ={ sg }=> true  *)
+| xorBS : forall sg b1 b2 i1 i2 b,
+    b1 ={ sg }=> i1 ->
+    b2 ={ sg }=> i2 ->
+    b = (xor_err i1 i2) ->
+    xor b1 b2 ={ sg }=> b
+| lessthanBS : forall a1 a2 i1 i2 sg r,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
-    r = Z.leb i1 i2 ->
+    r = lt_err i1 i2 ->
     lt a1 a2 ={ sg }=> r
-where "B ={ S }=> B'" := (boolBS B S B'). *)
+| greaterthanBS : forall a1 a2 i1 i2 sg r,
+    a1 =[ sg ]=> i1 ->
+    a2 =[ sg ]=> i2 ->
+    r = gt_err i1 i2 ->
+    gt a1 a2 ={ sg }=> r
+| lesseqBS : forall a1 a2 i1 i2 sg r,
+    a1 =[ sg ]=> i1 ->
+    a2 =[ sg ]=> i2 ->
+    r = leq_err i1 i2 ->
+    lt a1 a2 ={ sg }=> r
+| greatereqBS : forall a1 a2 i1 i2 sg r,
+    a1 =[ sg ]=> i1 ->
+    a2 =[ sg ]=> i2 ->
+    r = geq_err i1 i2 ->
+    geq a1 a2 ={ sg }=> r
+where "B ={ S }=> B'" := (boolBS B S B').
 
-(* string expressions *)
-Inductive StExp :=
-| serror : StExp
-| sconstant : ErrorString -> StExp
-| sident : Var -> StExp
-| sconcat : ErrorString -> ErrorString -> StExp
-| slength : StExp -> StExp -> StExp
-| scomp : StExp -> StExp -> StExp.
-
-Coercion sconstant : ErrorString >-> StExp.
-Coercion sident : Var >-> StExp.
-
-
-(* Definition err_len (s : ErrorString) : ErrorZ :=
-  match s with
-  | error_string => error_Z
-  | vstring s => length s
-  end. *)
-
-Definition err_cat (s1 s2 : ErrorString) : ErrorString :=
-  match s1, s2 with
-  | error_string, _ => error_string
-  | _, error_string => error_string
-  | vstring s1, vstring s2 => vstring (s1 ++ s2)
-  end. 
 
 Inductive VExp :=
 | error_vector : VExp
-| vector_int : Var -> Z -> list Z -> VExp
-| vector_bool : Var -> bool -> list bool -> VExp
-| vecotr_str : Var -> string -> list string -> VExp.
+| vector_int : Z -> list Z -> VExp
+| vector_bool : bool -> list bool -> VExp.
 
-Notation "a '[' n ']' ":=(vector_int a n) (at level 50).
-Notation "a '|' n '|' ":=(vector_bool a n) (at level 50).
-(* Notation "a '/' n '\' ":=(vector_str a n) (at level 50). *)
+(* Notation "[ ]" := nil (format "[ ]") : list_scope.
+Notation "[ nr ]" := (cons nr nil) : list_scope.
+Notation "{ n1 , n2 , .. , nn }" := (cons n1 (cons n2 .. (cons nn nil) ..)) : list_scope.
+ *)
+
+
+(* Notation "a '[' n ']' ":=(vector_int a n) (at level 50).
+Notation "a '|' n '|' ":=(vector_bool a n) (at level 50). *)
 
 (* flow controls + assignment + sequence *)
+
 Inductive Stmt :=
-| decl_equals_Z : Var -> AExp -> Stmt
-| decl_equals_bool : Var -> BExp -> Stmt
-| decl_equals_string : Var -> StExp -> Stmt
-| decl_equals_vectZ : Var -> Stmt -> VExp -> Stmt
-| decl_equals_vectbool : Var -> Stmt -> VExp -> Stmt
-| decl_equals_vectstring : Var -> Stmt -> VExp -> Stmt
-| decl : Var -> Stmt
-| equals : Var -> AExp -> Stmt
+| decl_equals_Z : string -> AExp -> Stmt
+| decl_equals_bool : string -> Stmt -> BExp -> Stmt
+| decl_equals_string : string -> Stmt -> StExp -> Stmt
+| decl_equals_vectZ : string -> AExp -> VExp -> Stmt
+| decl_equals_vectbool : string -> Stmt -> VExp -> Stmt
+| decl_Z : string -> Stmt
+| decl_bool : string -> Stmt
+| decl_string : string -> Stmt
+| equals : string -> AExp -> Stmt
 | seqinflow : Stmt -> Stmt -> Stmt
 | ifthen : BExp -> Stmt -> Stmt
 | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
@@ -403,15 +556,19 @@ with Cases :=
     | default_case : Stmt -> Cases.
 
 (* notations for flow controls *)
-Notation " 'I' 'HAS' 'A' 'NUMBR' a 'ITZ' b" := (decl_equals_Z a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'ANUMBR' a 'ITZ' b" := (decl_equals_vectZ a b) (at level 50).
+(* Notation " 'I' 'HAS' 'A' 'NUMBR' a 'ITZ' b" := (decl_equals_Z a b) (at level 50).
 Notation " 'I' 'HAS' 'A' 'TROOF' a 'ITZ' b" := (decl_equals_bool a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'ATROOF' a 'ITZ' b" := (decl_equals_vectbool a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'YARN' a 'ITZ' b" := (decl_equals_string a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'AYARN' a 'ITZ' b" := (decl_equals_vectstring a b) (at level 50).
-Notation " 'I' 'HAS' 'A' a" := (decl a) (at level 50).
-Notation "a 'AN' b" := (seqinflow a b)(at level 90).
+Notation " 'I' 'HAS' 'A' 'YARN' a 'ITZ' b" := (decl_equals_string a b) (at level 50). *)
+Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_equals_vectZ a (number n)) (at level 50).
+Notation " 'I' 'HAS' 'A' 'ATROOF' a { n }" := (decl_equals_vectbool a (number n)) (at level 50).
+Notation " 'I' 'HAS' 'A' 'NUMBR' a" := (decl_Z a) (at level 50).
+Notation " 'I' 'HAS' 'A' 'TROOF' a" := (decl_bool a) (at level 50).
+Notation " 'I' 'HAS' 'A' 'YARN' a" := (decl_string a) (at level 50).
+
+Notation "a 'AN' b" := (seqinflow a b)(at level 90). (*pentru secventele folosite in partea de conditional*)
+Notation "a ; b" := (seqinflow a b) (at level 90).
 Notation "a 'R' b" := (equals a b) (at level 50).
+
 Notation " cond 'O' 'RLY?' 'YA' 'RLY' s1 'NO' 'WAI' s2 'OIC'" := (ifthenelse cond s1 s2) (at level 95).
 Notation " cond 'O' 'RLY?' 'YA' 'RLY' s 'OIC'" := (ifthen cond s) (at level 95).
 Notation " 'IM' 'IN' 'YR' 'LOOP' 'WHILE' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (while cond s) (at level 95).
@@ -421,6 +578,10 @@ Notation " 'IM' 'IN' 'YR' 'LOOP' oper 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOO
 Notation "'ENUF'" := (break) (at level 90).
 Notation "'GOON'" := (continue) (at level 90).
 
+Check (I HAS A NUMBR "a" ; "a" R 12).
+Check (I HAS A ANUMBR "a" [ 30 ]).
+(* Check (I HAS A NUMBR "b" ITZ 10). *)
+
 (* notatii pentru functia switch() *)
 Notation "var ', WTF?' C1 .. Cn 'OIC'" := (switch var (cons C1 .. (cons Cn nil) .. )) (at level 97).
 Notation "'OMG' val seq" := (case_nr val seq) (at level 97).
@@ -428,7 +589,7 @@ Notation "'OMGWTF' seq" := (default_case seq) (at level 97).
 
 (* input-output functions *)
 Inductive InAndOut :=
-| scan : Var -> InAndOut
+| scan : string -> InAndOut
 | write : string -> InAndOut.
 
 Notation "'GIMMEH' var" := (scan var)(at level 91).
@@ -439,7 +600,6 @@ Inductive Code :=
 | mainf : Code -> Code.
 
 Notation "'HAI 1.2' seq 'KTHXBYE'" := (mainf seq) (at level 94).
-Notation "a ; b" := (seqwhole a b) (at level 90).
 
 
 
