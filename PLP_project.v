@@ -585,10 +585,6 @@ Inductive InAndOut :=
 Notation "'GIMMEH' var" := (scan var)(at level 91).
 Notation "'VISIBLE' var" := (write var)(at level 91).
 
-(* Inductive Code :=
-| mainf : Stmt -> Code.
-
-Notation "'HAI 1.2' seq 'KTHXBYE'" := (mainf seq) (at level 94). *)
 
 Reserved Notation "S -{ sg }-> sg'" (at level 60).
 Inductive strBS : Stmt -> Env -> Env -> Prop :=
@@ -655,14 +651,6 @@ Inductive strBS : Stmt -> Env -> Env -> Prop :=
     switch a s -{ sg }-> sg'
 where "s -{ sg }-> sg'" := (strBS s sg sg').
 
-(* Reserved Notation "C -( S )-> S'" (at level 70).
-Inductive codeBS : Code -> Env -> Env -> Prop :=
-| mainBS : forall st sg sg' sg'',
-  (var_notdecl (sg "main")) -( sg )-> true ->
-  sg' = (update sg "main" (mainf nil st))
-  st -( sg' )-> sg'' ->
-  mainf st -( sg )-> sg'
-where "C -( S )-> S'" := (codeBS C S S'). *)
 
 (* Check (SUM OF "VAR" AN 1).
  *)
