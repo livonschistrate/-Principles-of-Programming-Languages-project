@@ -26,6 +26,10 @@ Inductive ErrorString :=
 | vstring : string -> ErrorString.
 Coercion vstring : string >-> ErrorString.
 
+(* Inductive Var := 
+| id : string -> Var.
+Coercion id : string >-> Var. *)
+
 Inductive realVar :=
 | var_notdecl : realVar
 | undecl_noob : realVar
@@ -360,6 +364,7 @@ Notation "'BOTH' 'SAEM' 'AN' 'BIGGR' 'OF' a 'AN' b" := (geq a b) (at level 53).
 Notation "'BOTH' 'SAEM' 'AN' 'SMALLR' 'OF' a 'AN' b" := (leq a b) (at level 53).
 
 Check (NOT "x").
+Check (NOT true).
 Check (BOTH SAEM "a" AN BIGGR OF "a" AN "b").
 
 Definition non_err (n : ErrorBool) : ErrorBool :=
@@ -520,23 +525,17 @@ Inductive VExp :=
 | vector_int : Z -> list Z -> VExp
 | vector_bool : bool -> list bool -> VExp.
 
-(* Notation "[ ]" := nil (format "[ ]") : list_scope.
-Notation "[ nr ]" := (cons nr nil) : list_scope.
-Notation "{ n1 , n2 , .. , nn }" := (cons n1 (cons n2 .. (cons nn nil) ..)) : list_scope.
- *)
-
-
 (* Notation "a '[' n ']' ":=(vector_int a n) (at level 50).
 Notation "a '|' n '|' ":=(vector_bool a n) (at level 50). *)
 
 (* flow controls + assignment + sequence *)
 
 Inductive Stmt :=
-| decl_equals_Z : string -> AExp -> Stmt
-| decl_equals_bool : string -> Stmt -> BExp -> Stmt
-| decl_equals_string : string -> Stmt -> StExp -> Stmt
-| decl_equals_vectZ : string -> AExp -> VExp -> Stmt
-| decl_equals_vectbool : string -> Stmt -> VExp -> Stmt
+| equals_Z : string -> AExp -> Stmt
+| equals_bool : string -> BExp -> Stmt
+| equals_string : string -> StExp -> Stmt
+| decl_vectZ : string -> AExp -> VExp -> Stmt
+| decl_vectbool : string -> Stmt -> VExp -> Stmt
 | decl_Z : string -> Stmt
 | decl_bool : string -> Stmt
 | decl_string : string -> Stmt
@@ -556,11 +555,11 @@ with Cases :=
     | default_case : Stmt -> Cases.
 
 (* notations for flow controls *)
-(* Notation " 'I' 'HAS' 'A' 'NUMBR' a 'ITZ' b" := (decl_equals_Z a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'TROOF' a 'ITZ' b" := (decl_equals_bool a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'YARN' a 'ITZ' b" := (decl_equals_string a b) (at level 50). *)
-Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_equals_vectZ a (number n)) (at level 50).
-Notation " 'I' 'HAS' 'A' 'ATROOF' a { n }" := (decl_equals_vectbool a (number n)) (at level 50).
+Notation " a 'ITZ' b" := (equals_Z a b) (at level 50).
+Notation " a 'ITZB' b" := (equals_bool a b) (at level 50).
+Notation " a 'ITS' b" := (equals_string a b) (at level 50).
+Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_vectZ a (number n)) (at level 50).
+Notation " 'I' 'HAS' 'A' 'ATROOF' a { n }" := (decl_vectbool a (number n)) (at level 50).
 Notation " 'I' 'HAS' 'A' 'NUMBR' a" := (decl_Z a) (at level 50).
 Notation " 'I' 'HAS' 'A' 'TROOF' a" := (decl_bool a) (at level 50).
 Notation " 'I' 'HAS' 'A' 'YARN' a" := (decl_string a) (at level 50).
@@ -572,15 +571,15 @@ Notation "a 'R' b" := (equals a b) (at level 50).
 Notation " cond 'O' 'RLY?' 'YA' 'RLY' s1 'NO' 'WAI' s2 'OIC'" := (ifthenelse cond s1 s2) (at level 95).
 Notation " cond 'O' 'RLY?' 'YA' 'RLY' s 'OIC'" := (ifthen cond s) (at level 95).
 Notation " 'IM' 'IN' 'YR' 'LOOP' 'WHILE' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (while cond s) (at level 95).
-Notation " 'IM' 'IN' 'YR' 'LOOP' 'BUFFIN' 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_buff a cond s) (at level 95).
-Notation " 'IM' 'IN' 'YR' 'LOOP' 'NERFIN' 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_nerf a cond s) (at level 95).
+(* Notation " 'IM' 'IN' 'YR' 'LOOP' 'BUFFIN' 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_buff a cond s) (at level 95).
+Notation " 'IM' 'IN' 'YR' 'LOOP' 'NERFIN' 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_nerf a cond s) (at level 95). *)
 Notation " 'IM' 'IN' 'YR' 'LOOP' oper 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_any oper a cond s) (at level 95).
 Notation "'ENUF'" := (break) (at level 90).
 Notation "'GOON'" := (continue) (at level 90).
 
 Check (I HAS A NUMBR "a" ; "a" R 12).
 Check (I HAS A ANUMBR "a" [ 30 ]).
-(* Check (I HAS A NUMBR "b" ITZ 10). *)
+Check (I HAS A NUMBR "b" ; "b" ITZ 10).
 
 (* notatii pentru functia switch() *)
 Notation "var ', WTF?' C1 .. Cn 'OIC'" := (switch var (cons C1 .. (cons Cn nil) .. )) (at level 97).
@@ -597,12 +596,84 @@ Notation "'VISIBLE' var" := (write var)(at level 91).
 
 Inductive Code :=
 | seqwhole : Code -> Code -> Code
-| mainf : Code -> Code.
+| mainf : Stmt -> Code.
 
 Notation "'HAI 1.2' seq 'KTHXBYE'" := (mainf seq) (at level 94).
 
-
-
+Reserved Notation "S -{ sg }-> sg'" (at level 60).
+Inductive strBS : Stmt -> Env -> Env -> Prop :=
+| decl_ZBS : forall i x sg sg',
+    sg' = (update sg x (numbr_e i)) ->
+    decl_Z x -{ sg }-> sg'
+| decl_BoolBS : forall i x sg sg',
+    sg' = (update sg x (troof_e i)) ->
+    decl_bool x -{ sg }-> sg'
+| decl_StringBS : forall i x sg sg',
+    sg' = (update sg x (strng_e i)) ->
+    decl_string x -{ sg }-> sg'
+| equal_ZBS : forall a i x sg sg',
+    a =[ sg ]=> i ->
+    sg' = (update sg x (numbr_e i)) ->
+    equals_Z x a -{ sg }-> sg'
+| equal_boolBS : forall a i x sg sg',
+    a ={ sg }=> i ->
+    sg' = (update sg x (troof_e i)) ->
+    equals_bool x a -{ sg }-> sg'
+| equalZBS : forall a i x sg sg',
+    sg' = (update sg x (strng_e i)) ->
+    equals_string x a -{ sg }-> sg'
+| seqBS : forall s1 s2 sg sg1 sg2,
+    s1 -{ sg }-> sg1 ->
+    s2 -{ sg1 }-> sg2 ->
+    seqinflow s1 s2 -{ sg }-> sg2
+| ifelse_falseBS : forall cond s1 s2 sg sg',
+    cond ={ sg }=> false ->
+    s2 -{ sg }-> sg' ->
+    ifthenelse cond s1 s2 -{ sg }-> sg'
+| ifelse_trueBS : forall cond s1 s2 sg sg',
+    cond ={ sg }=> true ->
+    s1 -{ sg }-> sg' ->
+    ifthenelse cond s1 s2 -{ sg }-> sg'
+| iftrueBS : forall cond s sg sg',
+    cond ={ sg }=> true ->
+    s -{ sg }-> sg' ->
+    ifthen cond s -{ sg }-> sg'
+| iffalseBS : forall cond s sg sg',
+    cond ={ sg }=> false ->
+    ifthen cond s -{ sg }-> sg'
+| whilefalseBS : forall b s sg,
+    b ={ sg }=> false ->
+    while b s -{ sg }-> sg
+| whiletrueBS : forall b s sg sg',
+    b ={ sg }=> true ->
+    (s ; while b s) -{ sg }-> sg' ->
+    while b s -{ sg }-> sg'
+| forany_trueBS : forall init cond op s sg sg',
+    cond ={ sg }=> true ->
+    ( init ; while cond (s ; op) ) -{ sg }-> sg' ->
+    forsq_any op init cond s -{ sg }-> sg'
+| forany_falseBS : forall init cond op s sg sg',
+    cond ={ sg }=> false ->
+    forsq_any op init cond s -{ sg }-> sg'
+(* | forbuff_trueBS : forall init cond s bf sg sg',
+    cond ={ sg }=> true ->
+    ( init ; while cond (s ; bf) ) -{ sg }-> sg' ->
+    forsq_buff init cond s -{ sg }-> sg'
+| forbuff_falseBS : forall init cond s sg sg',
+    cond ={ sg }=> false ->
+    forsq_buff init cond s -{ sg }-> sg'
+| fornerf_trueBS : forall init cond s nf sg sg',
+    cond ={ sg }=> true ->
+    ( init ; while cond (s ; nf) ) -{ sg }-> sg' ->
+    forsq_nerf init cond s -{ sg }-> sg'
+| fornerf_falseBS : forall init cond s sg sg',
+    cond ={ sg }=> false ->
+    forsq_nerf init cond s -{ sg }-> sg' *)
+| breakBS : forall s sg,
+    s -{ sg }-> sg
+| continueBS : forall s sg,
+    s -{ sg }-> sg
+where "s -{ sg }-> sg'" := (strBS s sg sg').
 
 
 
