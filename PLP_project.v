@@ -11,28 +11,23 @@ Local Open Scope Z_scope.
 Require Import Coq.Lists.List.
 Local Open Scope list_scope.
 
-Inductive ErrorZ :=
+Inductive ErrorZ := (* variabila int = NUMBR *)
 | error_Z : ErrorZ
 | number : Z -> ErrorZ.
 Coercion number : Z >-> ErrorZ.
 
-Inductive ErrorBool :=
+Inductive ErrorBool := (* variabila bool = TROOF *)
 | error_bool : ErrorBool
 | boolean : bool -> ErrorBool.
 Coercion boolean : bool >-> ErrorBool.
 
-Inductive ErrorString :=
+Inductive ErrorString := (* variabila string = YARN *)
 | error_string : ErrorString
 | vstring : string -> ErrorString.
 Coercion vstring : string >-> ErrorString.
 
-(* Inductive Var := 
-| id : string -> Var.
-Coercion id : string >-> Var. *)
-
 Inductive realVar :=
 | var_notdecl : realVar
-| undecl_noob : realVar
 | error_equal : realVar
 | default : realVar
 | numbr_e : ErrorZ -> realVar
@@ -45,14 +40,10 @@ Definition Env := string -> realVar.
 Definition env_notdecl : Env :=
     fun v => var_notdecl.
 
-Definition CheckVar (a : realVar) (b : realVar) : bool :=
+Definition CheckVar (a : realVar) (b : realVar) : bool := (* se verifica daca acea variabila exista *)
   match a with
   | var_notdecl => match b with
                    | var_notdecl => true
-                   | _ => false
-                   end
-  | undecl_noob => match b with
-                   | undecl_noob => true
                    | _ => false
                    end
   | error_equal => match b with
@@ -92,8 +83,47 @@ Definition update (env : Env) (s : string) (x : realVar) : Env :=
             else env y.
 
 
-(* Definition update (env : Env) (v : string) (value : realVar) : Env :=
-  fun x => if (eqb x v) then value else env x. *)
+
+(* string expressions *)
+Inductive StExp :=
+| sconstant : ErrorString -> StExp
+| sident : string -> StExp
+| sconcat : StExp -> StExp -> StExp.
+
+Coercion sconstant : ErrorString >-> StExp.
+Coercion sident : string >-> StExp.
+
+Definition convert_string (s: ErrorString) : string := 
+  match s with
+  | error_string => ""
+  | vstring s' => s'
+  end.
+
+Notation "'CONCAT' a 'WIT' b" := (sconcat a b) (at level 50).
+
+(* Check length(convert_string "long"). *)
+
+Definition err_cat (s1 s2 : ErrorString) : ErrorString :=
+  match s1, s2 with
+  | error_string, _ => error_string
+  | _, error_string => error_string
+  | vstring s1, vstring s2 => vstring (s1 ++ s2)
+  end. 
+
+(* Big-Step semantics for string expressions *)
+Reserved Notation "st -[ S ]-> st'" (at level 70).
+Inductive stringBS : StExp -> Env -> ErrorString -> Prop :=
+| sconstantBS : forall s sg, sconstant s -[ sg ]-> s
+| sidentBS : forall sid sg, sident sid -[ sg ]-> match (sg sid) with
+                                              | strng_e sid => sid
+                                              | _ => ""
+                                              end
+| scatBS : forall s1 s2 r i1 i2 sg,
+    s1 -[ sg ]-> i1 ->
+    s2 -[ sg ]-> i2 ->
+    r = err_cat i1 i2 ->
+    sconcat s1 s2 -[ sg ]-> r
+where "st -[ S ]-> st'" := (stringBS st S st').
 
 Inductive AExp :=
 (* arithmetic expressions *)
@@ -108,7 +138,8 @@ Inductive AExp :=
 | decrement : AExp -> AExp
 | maximum : AExp -> AExp -> AExp
 | minimum : AExp -> AExp -> AExp
-| swap : AExp -> AExp -> AExp.
+| swap : AExp -> AExp -> AExp
+| len : StExp -> AExp.
 
 Coercion aconstant : ErrorZ >-> AExp.
 Coercion aident : string >-> AExp.
@@ -133,10 +164,13 @@ Notation "'NERF' n" := (decrement n) (at level 48).
 
 Notation "'FWAP' a 'WIT' b" := (swap a b) (at level 48).
 
+Notation "'LANG' 'OF' a" := (len a) (at level 49).
+
 Check (SUM OF 3 AN 4).
 Check (DIFF OF "a" AN 2).
 Check (BUFF 15).
 Check (NERF "i").
+Check (LANG OF "b").
 
 
 (* simulating arithmetic calculus errors *)
@@ -214,30 +248,11 @@ Definition min_err (n1 n2 : ErrorZ) : ErrorZ :=
   | error_Z, _ => error_Z
   | _, error_Z => error_Z
   | number n1 , number n2 => number (SWAP n1 WIT n2)
-  end. *)
+  end. 
 
-(* classic semantics for arithmetic expressions - in works *)
-(* Fixpoint afunct (a : AExp) (env : Env) : ErrorZ :=
-  match a with
-  | aident aid => match (env aid) with
-                 | numbr_e n => n
-                 | _ => error_Z
-                 end
-  | aconstant n => n
-  | plus a1 a2 => plus_err(afunct a1 env) (afunct a2 env)
-  | minus a1 a2 => minus_err(afunct a1 env) (afunct a2 env)
-  | multiply a1 a2 => multiply_err(afunct a1 env) (afunct a2 env)
-  | divide a1 a2 => divide_err(afunct a1 env) (afunct a2 env)
-  | modulo a1 a2 => modulo_err (afunct a1 env) (afunct a2 env)
-  | increment bf => incr_err (afunct bf env)
-  | decrement nf => decr_err (afunct nf env)
-  | maximum m1 m2 => max_err (afunct m1 env) (afunct m2 env)
-                     
-  | minimum m1 m2 => min_err (afunct m1 env) (afunct m2 env)
-                    
-  end. *)
+  aici n-am inteles cum sa-l implementez *)
 
-(* Big-Step semantics for arithmetic expressions - in works *)
+(* Big-Step semantics for arithmetic expressions *)
 Reserved Notation "A =[ S ]=> N" (at level 60).
 Inductive aritBS : AExp -> Env -> ErrorZ -> Prop :=
 | constantBS : forall n sg, aconstant n =[ sg ]=> n
@@ -288,47 +303,13 @@ Inductive aritBS : AExp -> Env -> ErrorZ -> Prop :=
     a2 =[ sg ]=> i2 ->
     b = min_err i1 i2 ->
     minimum a1 a2 =[ sg ]=> b
+(* | lenBS : forall s i sg r,
+    s -[ sg ]-> i ->
+    r = numbr_e (length (convert_string s)) ->
+    len s =[ sg ]=> r *)
 where "a =[ sg ]=> n" := (aritBS a sg n).
 
-(* string expressions *)
-Inductive StExp :=
-| sconstant : ErrorString -> StExp
-| sident : string -> StExp
-| sconcat : StExp -> StExp -> StExp
-| slen : StExp -> StExp -> StExp.
 
-Coercion sconstant : ErrorString >-> StExp.
-Coercion sident : string >-> StExp.
-
-(* Notation "'COMP' a 'WIT' b" := (scomp a b)(at level 50). *)
-(* Notation "'CONCAT' a 'WIT' b" := (sconcat a b) (at level 50). *)
-
-(* Check length("long"). *)
-
-Definition err_cat (s1 s2 : ErrorString) : ErrorString :=
-  match s1, s2 with
-  | error_string, _ => error_string
-  | _, error_string => error_string
-  | vstring s1, vstring s2 => vstring (s1 ++ s2)
-  end. 
-
-(* Definition err_len (s : ErrorString) := 
-  match s with
-  | nostring => Z0
-  | estring c s' => 1 + lenh s'
-  end. *)
-
-(* Definition comp_err (s1 s2 : ErrorString) : ErrorZ :=
-  match s1, s2 with
-  | error_string, _ => error_Z
-  | _, error_string => error_Z
-  | vstring s1 , vstring s2 => if boolean (Z.ltb (length(s1) length(s2)))
-                       then -1
-                       else if boolean (Z.eq (length(s1) length(s2)))
-                            then 0
-                            else 1
-  end.
- *)
 
 (* boolean expressions *)
 Inductive BExp :=
@@ -362,10 +343,12 @@ Notation "'DIFFRINT' 'AN' 'BIGGR' 'OF' a 'AN' b" := (lt a b) (at level 53).
 Notation "'DIFFRINT' 'AN' 'SMALLR' 'OF' a 'AN' b" := (gt a b) (at level 53).
 Notation "'BOTH' 'SAEM' 'AN' 'BIGGR' 'OF' a 'AN' b" := (geq a b) (at level 53).
 Notation "'BOTH' 'SAEM' 'AN' 'SMALLR' 'OF' a 'AN' b" := (leq a b) (at level 53).
+Notation "'COMP' a 'WIT' b" := (scomp a b)(at level 50).
 
 Check (NOT "x").
 Check (NOT true).
 Check (BOTH SAEM "a" AN BIGGR OF "a" AN "b").
+Check (COMP "a" WIT "x").
 
 Definition non_err (n : ErrorBool) : ErrorBool :=
   match n with
@@ -436,8 +419,17 @@ Definition geq_err (n1 n2 : ErrorZ) : ErrorBool :=
   | number n1 , number n2 => boolean (Z.leb n2 n1)
   end.
 
-(* Definition scmp (s1 s2 : ErrorString) : ErrorString :=
-  fun  *)
+Definition equal_strings (s1 s2 : string ) : bool :=
+  if(string_dec s1 s2) 
+  then true 
+  else false. (* folosit pentru egalitatea a doua stringuri *)
+
+Definition scmp (s1 s2 : ErrorString) : ErrorBool :=
+  match s1, s2 with
+  | error_string, _ => error_bool
+  | _, error_string => error_bool
+  | vstring s1 , vstring s2 => equal_strings (convert_string s1) (convert_string s2)
+  end.
 
 
 (* Big-Step semantics for boolean expressions - in works *)
@@ -517,29 +509,29 @@ Inductive boolBS : BExp -> Env -> ErrorBool -> Prop :=
     a2 =[ sg ]=> i2 ->
     r = geq_err i1 i2 ->
     geq a1 a2 ={ sg }=> r
+| cmpBS : forall s1 s2 i1 i2 sg r,
+    s1 -[ sg ]-> i1 ->
+    s2 -[ sg ]-> i2 ->
+    r = scmp i1 i2 ->
+    scomp s1 s2 ={ sg }=> r
 where "B ={ S }=> B'" := (boolBS B S B').
 
 
 Inductive VExp :=
 | error_vector : VExp
-| vector_int : Z -> list Z -> VExp
-| vector_bool : bool -> list bool -> VExp.
+| vector_int : Z -> list Z -> VExp.
 
-(* Notation "a '[' n ']' ":=(vector_int a n) (at level 50).
-Notation "a '|' n '|' ":=(vector_bool a n) (at level 50). *)
 
 (* flow controls + assignment + sequence *)
-
 Inductive Stmt :=
 | equals_Z : string -> AExp -> Stmt
 | equals_bool : string -> BExp -> Stmt
 | equals_string : string -> StExp -> Stmt
-| decl_vectZ : string -> AExp -> VExp -> Stmt
-| decl_vectbool : string -> Stmt -> VExp -> Stmt
+| equalsvect_Z: string -> VExp -> Stmt
+| decl_vectZ : string -> VExp -> Stmt
 | decl_Z : string -> Stmt
 | decl_bool : string -> Stmt
 | decl_string : string -> Stmt
-| equals : string -> AExp -> Stmt
 | seqinflow : Stmt -> Stmt -> Stmt
 | ifthen : BExp -> Stmt -> Stmt
 | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
@@ -547,39 +539,38 @@ Inductive Stmt :=
 | forsq_any : Stmt -> Stmt -> BExp -> Stmt -> Stmt
 | break : Stmt
 | continue : Stmt
-| forsq_buff : Stmt -> BExp -> Stmt -> Stmt
-| forsq_nerf : Stmt -> BExp -> Stmt -> Stmt
+| comment : string -> Stmt
 | switch : AExp -> list Cases -> Stmt
 with Cases :=
     | case_nr : AExp -> Stmt -> Cases
     | default_case : Stmt -> Cases.
 
 (* notations for flow controls *)
-Notation " a 'ITZ' b" := (equals_Z a b) (at level 50).
-Notation " a 'ITZB' b" := (equals_bool a b) (at level 50).
-Notation " a 'ITS' b" := (equals_string a b) (at level 50).
-Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_vectZ a (number n)) (at level 50).
-Notation " 'I' 'HAS' 'A' 'ATROOF' a { n }" := (decl_vectbool a (number n)) (at level 50).
-Notation " 'I' 'HAS' 'A' 'NUMBR' a" := (decl_Z a) (at level 50).
-Notation " 'I' 'HAS' 'A' 'TROOF' a" := (decl_bool a) (at level 50).
-Notation " 'I' 'HAS' 'A' 'YARN' a" := (decl_string a) (at level 50).
+Notation " a 'ITZ' b" := (equals_Z a b) (at level 90).
+Notation " a 'ITZB' b" := (equals_bool a b) (at level 90).
+Notation " a 'ITS' b" := (equals_string a b) (at level 90).
+Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_vectZ a (vector_int n nil)) (at level 90).
+Notation " 'I' 'HAS' 'A' 'NUMBR' a" := (decl_Z a) (at level 90).
+Notation " 'I' 'HAS' 'A' 'TROOF' a" := (decl_bool a) (at level 90).
+Notation " 'I' 'HAS' 'A' 'YARN' a" := (decl_string a) (at level 90).
 
 Notation "a 'AN' b" := (seqinflow a b)(at level 90). (*pentru secventele folosite in partea de conditional*)
-Notation "a ; b" := (seqinflow a b) (at level 90).
-Notation "a 'R' b" := (equals a b) (at level 50).
+Notation "a ; b" := (seqinflow a b) (at level 91).
+Notation "'BTW' comm" := (comment comm) (at level 90).
+Notation "'OBTW' comm 'TLDR'" := (comment comm) (at level 90).
+
 
 Notation " cond 'O' 'RLY?' 'YA' 'RLY' s1 'NO' 'WAI' s2 'OIC'" := (ifthenelse cond s1 s2) (at level 95).
 Notation " cond 'O' 'RLY?' 'YA' 'RLY' s 'OIC'" := (ifthen cond s) (at level 95).
-Notation " 'IM' 'IN' 'YR' 'LOOP' 'WHILE' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (while cond s) (at level 95).
-(* Notation " 'IM' 'IN' 'YR' 'LOOP' 'BUFFIN' 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_buff a cond s) (at level 95).
-Notation " 'IM' 'IN' 'YR' 'LOOP' 'NERFIN' 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_nerf a cond s) (at level 95). *)
+Notation " 'IM' 'IN' 'YR' 'WHILE' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (while cond s) (at level 95).
 Notation " 'IM' 'IN' 'YR' 'LOOP' oper 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_any oper a cond s) (at level 95).
 Notation "'ENUF'" := (break) (at level 90).
 Notation "'GOON'" := (continue) (at level 90).
 
-Check (I HAS A NUMBR "a" ; "a" R 12).
-Check (I HAS A ANUMBR "a" [ 30 ]).
-Check (I HAS A NUMBR "b" ; "b" ITZ 10).
+Check (I HAS A NUMBR "a" ; "a" ITZ 12).
+Check (I HAS A ANUMBR "a" [30]).
+Check (I HAS A TROOF "b" ; "b" ITZB false).
+Check ( "c" ITS "ff").
 
 (* notatii pentru functia switch() *)
 Notation "var ', WTF?' C1 .. Cn 'OIC'" := (switch var (cons C1 .. (cons Cn nil) .. )) (at level 97).
@@ -594,11 +585,10 @@ Inductive InAndOut :=
 Notation "'GIMMEH' var" := (scan var)(at level 91).
 Notation "'VISIBLE' var" := (write var)(at level 91).
 
-Inductive Code :=
-| seqwhole : Code -> Code -> Code
+(* Inductive Code :=
 | mainf : Stmt -> Code.
 
-Notation "'HAI 1.2' seq 'KTHXBYE'" := (mainf seq) (at level 94).
+Notation "'HAI 1.2' seq 'KTHXBYE'" := (mainf seq) (at level 94). *)
 
 Reserved Notation "S -{ sg }-> sg'" (at level 60).
 Inductive strBS : Stmt -> Env -> Env -> Prop :=
@@ -655,26 +645,30 @@ Inductive strBS : Stmt -> Env -> Env -> Prop :=
 | forany_falseBS : forall init cond op s sg sg',
     cond ={ sg }=> false ->
     forsq_any op init cond s -{ sg }-> sg'
-(* | forbuff_trueBS : forall init cond s bf sg sg',
-    cond ={ sg }=> true ->
-    ( init ; while cond (s ; bf) ) -{ sg }-> sg' ->
-    forsq_buff init cond s -{ sg }-> sg'
-| forbuff_falseBS : forall init cond s sg sg',
-    cond ={ sg }=> false ->
-    forsq_buff init cond s -{ sg }-> sg'
-| fornerf_trueBS : forall init cond s nf sg sg',
-    cond ={ sg }=> true ->
-    ( init ; while cond (s ; nf) ) -{ sg }-> sg' ->
-    forsq_nerf init cond s -{ sg }-> sg'
-| fornerf_falseBS : forall init cond s sg sg',
-    cond ={ sg }=> false ->
-    forsq_nerf init cond s -{ sg }-> sg' *)
 | breakBS : forall s sg,
     s -{ sg }-> sg
-| continueBS : forall s sg,
-    s -{ sg }-> sg
+| continueBS : forall s sg sg',
+    s -{ sg }-> sg'
+| switchBS : forall a i case b s sg sg',
+    a =[ sg ]=> i ->
+    b = same i case ->
+    switch a s -{ sg }-> sg'
 where "s -{ sg }-> sg'" := (strBS s sg sg').
 
+(* Reserved Notation "C -( S )-> S'" (at level 70).
+Inductive codeBS : Code -> Env -> Env -> Prop :=
+| mainBS : forall st sg sg' sg'',
+  (var_notdecl (sg "main")) -( sg )-> true ->
+  sg' = (update sg "main" (mainf nil st))
+  st -( sg' )-> sg'' ->
+  mainf st -( sg )-> sg'
+where "C -( S )-> S'" := (codeBS C S S'). *)
 
+(* Check (SUM OF "VAR" AN 1).
+ *)
+Check ( I HAS A NUMBR "a"; "a" ITZ 0 ; IM IN YR LOOP (SUM OF "a" AN 1) YR "a" TIL (BOTH SAEM "a" AN 8) 
+  SUM OF "a" AN 3.
+IM OUTTA YR LOOP.
+        )
 
 
