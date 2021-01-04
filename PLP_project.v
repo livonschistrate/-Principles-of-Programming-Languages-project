@@ -654,9 +654,21 @@ where "s -{ sg }-> sg'" := (strBS s sg sg').
 
 (* Check (SUM OF "VAR" AN 1).
  *)
-Check ( I HAS A NUMBR "a"; "a" ITZ 0 ; IM IN YR LOOP (SUM OF "a" AN 1) YR "a" TIL (BOTH SAEM "a" AN 8) 
-  SUM OF "a" AN 3.
-IM OUTTA YR LOOP.
-        )
+ Check(BOTH SAEM "ANIMAL" AN "CAT"
+  O RLY?
+    YA RLY 
+    VISIBLE "J00 HAV A CAT"
+  OIC).
+ 
+Check ( I HAS A NUMBR "a"; "a" ITZ 0 ; 
+IM IN YR LOOP (SUM OF "a" AN 1) YR "a" TIL (BOTH SAEM "a" AN 8) 
+  SUM OF "a" AN 3
+IM OUTTA YR LOOP
+        ).
 
+Check ( I HAS A NUMBR "a"; "a" ITZ 0 ; 
+IM IN YR WHILE (BOTH SAEM "a" AN 8) 
+  SUM OF "a" AN 2
+IM OUTTA YR WHILE
+        ).
 
