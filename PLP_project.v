@@ -2,26 +2,26 @@
 Require Import Strings.String.
 Local Open Scope string_scope.
 Scheme Equality for string.
+Require Import Ascii.
 
 (* integral requirements *)
 Require Import Coq.ZArith.BinInt.
 Local Open Scope Z_scope.
 
 (* requirements for cases and arrays *)
-Require Import Coq.Lists.List.
 Local Open Scope list_scope.
 
-Inductive ErrorZ := (* variabila int = NUMBR *)
+Inductive ErrorZ : Type := (* variabila int = NUMBR *)
 | error_Z : ErrorZ
 | number : Z -> ErrorZ.
 Coercion number : Z >-> ErrorZ.
 
-Inductive ErrorBool := (* variabila bool = TROOF *)
+Inductive ErrorBool : Type := (* variabila bool = TROOF *)
 | error_bool : ErrorBool
 | boolean : bool -> ErrorBool.
 Coercion boolean : bool >-> ErrorBool.
 
-Inductive ErrorString := (* variabila string = YARN *)
+Inductive ErrorString : Type := (* variabila string = YARN *)
 | error_string : ErrorString
 | vstring : string -> ErrorString.
 Coercion vstring : string >-> ErrorString.
@@ -33,6 +33,8 @@ Inductive realVar :=
 | numbr_e : ErrorZ -> realVar
 | troof_e : ErrorBool -> realVar
 | strng_e : ErrorString -> realVar.
+
+Check numbr_e. Check ErrorZ.
 
 Scheme Equality for realVar.
 
@@ -69,7 +71,7 @@ Definition CheckVar (a : realVar) (b : realVar) : bool := (* se verifica daca ac
 end.
 
 Definition update (env : Env) (s : string) (x : realVar) : Env :=
-  fun y => if (eqb y s)
+  fun y => if (string_beq y s)
               then 
               if (andb (CheckVar (var_notdecl) (env y)) (negb(CheckVar (default) (x))))
               then var_notdecl
@@ -91,7 +93,6 @@ Inductive StExp :=
 | sconcat : StExp -> StExp -> StExp.
 
 Coercion sconstant : ErrorString >-> StExp.
-Coercion sident : string >-> StExp.
 
 Definition convert_string (s: ErrorString) : string := 
   match s with
@@ -111,7 +112,7 @@ Definition err_cat (s1 s2 : ErrorString) : ErrorString :=
   end. 
 
 (* Big-Step semantics for string expressions *)
-Reserved Notation "st -[ S ]-> st'" (at level 70).
+Reserved Notation "st -[ S ]-> st'" (at level 50).
 Inductive stringBS : StExp -> Env -> ErrorString -> Prop :=
 | sconstantBS : forall s sg, sconstant s -[ sg ]-> s
 | sidentBS : forall sid sg, sident sid -[ sg ]-> match (sg sid) with
@@ -145,26 +146,17 @@ Coercion aconstant : ErrorZ >-> AExp.
 Coercion aident : string >-> AExp.
 
 (* notations for arithmetic expressions*)
-Notation "'SUM' 'OF' a 'AN' b" := (plus a b) (at level 48).
-Notation "'DIFF' 'OF' a 'AN' b" := (minus a b) (at level 48).
-
-Notation "'PRODUKT' 'OF' a 'AN' b" := (multiply a b) (at level 46).
-
-Notation "'QUOSHUNT' 'OF' a 'AN' b" := (divide a b) (at level 46).
-
-Notation "'MOD' 'OF' a 'AN' b" := (modulo a b) (at level 46).
-
-Notation "'BIGGR' 'OF' a 'AN' b" := (maximum a b) (at level 49).
-
-Notation "'SMALLR' 'OF' a 'AN' b" := (minimum a b) (at level 49).
-
-Notation "'BUFF' n" := (increment n) (at level 48).
-
-Notation "'NERF' n" := (decrement n) (at level 48).
-
-Notation "'FWAP' a 'WIT' b" := (swap a b) (at level 48).
-
-Notation "'LANG' 'OF' a" := (len a) (at level 49).
+Notation "'SUM' 'OF' a 'AN' b" := (plus a b) (at level 20).
+Notation "'DIFF' 'OF' a 'AN' b" := (minus a b) (at level 20).
+Notation "'PRODUKT' 'OF' a 'AN' b" := (multiply a b) (at level 24).
+Notation "'QUOSHUNT' 'OF' a 'AN' b" := (divide a b) (at level 24).
+Notation "'MOD' 'OF' a 'AN' b" := (modulo a b) (at level 24).
+Notation "'BIGGR' 'OF' a 'AN' b" := (maximum a b) (at level 40).
+Notation "'SMALLR' 'OF' a 'AN' b" := (minimum a b) (at level 40).
+Notation "'BUFF' n" := (increment n) (at level 20).
+Notation "'NERF' n" := (decrement n) (at level 20).
+Notation "'FWAP' a 'WIT' b" := (swap a b) (at level 45).
+Notation "'LANG' 'OF' a" := (len a) (at level 46).
 
 Check (SUM OF 3 AN 4).
 Check (DIFF OF "a" AN 2).
@@ -247,7 +239,10 @@ Definition min_err (n1 n2 : ErrorZ) : ErrorZ :=
   match n1, n2 with
   | error_Z, _ => error_Z
   | _, error_Z => error_Z
-  | number n1 , number n2 => number (SWAP n1 WIT n2)
+  | number n1 , number n2 => match n1, n2 with
+                             | number n1 => n2
+                             | number n2 => n1
+                             end
   end. 
 
   aici n-am inteles cum sa-l implementez *)
@@ -258,7 +253,7 @@ Inductive aritBS : AExp -> Env -> ErrorZ -> Prop :=
 | constantBS : forall n sg, aconstant n =[ sg ]=> n
 | identBS : forall aid sg, aident aid =[ sg ]=> match (sg aid) with
                                               | numbr_e aid => aid
-                                              | _ => 0
+                                              | _ => error_Z
                                               end
 | plusBS : forall a1 a2 i1 i2 sg n,
     a1 =[ sg ]=> i1 ->
@@ -307,8 +302,46 @@ Inductive aritBS : AExp -> Env -> ErrorZ -> Prop :=
     s -[ sg ]-> i ->
     r = numbr_e (length (convert_string s)) ->
     len s =[ sg ]=> r *)
+(* | swapBS : forall a1 a2 i1 i2 aux sg,
+    a1 =[ sg ]=> i1 ->
+    a2 =[ sg ]=> i2 ->
+    aux = i1 ->
+    a1 = i2 ->
+    a2 = aux ->
+    swap a1 a2 =[ sg ]=> *)
 where "a =[ sg ]=> n" := (aritBS a sg n).
 
+Compute (env_notdecl "a").
+Example ex1 : SUM OF 3 AN 4 =[ env_notdecl ]=> 7.
+Proof.
+  eapply plusBS.
+  eapply constantBS.
+  eapply constantBS. 
+  simpl. reflexivity.
+Qed.
+
+Example ex2 : MOD OF 12 AN 0 =[ env_notdecl ]=> error_Z.
+Proof.
+  eapply modBS.
+  eapply constantBS.
+  eapply constantBS.
+  simpl. reflexivity.
+Qed.
+
+Example ex3 : BUFF 10 =[ env_notdecl ]=> 11.
+Proof.
+  eapply incrBS.
+  eapply constantBS.
+  simpl. reflexivity.
+Qed.
+
+Example ex4 : BIGGR OF 8 AN 5 =[ env_notdecl ]=> 8.
+Proof.
+  eapply maxBS.
+  eapply constantBS.
+  eapply constantBS.
+  simpl. reflexivity.
+Qed.
 
 
 (* boolean expressions *)
@@ -333,12 +366,12 @@ Coercion bconstant : ErrorBool >-> BExp.
 Coercion bident : string >-> BExp. 
 
 (* notations for boolean expressions *)
-Notation "'BOTH' 'OF' a 'AN' b" := (and a b) (at level 60).
-Notation "'EITHER' 'OF' a 'AN' b" := (or a b) (at level 60).
-Notation "'WON' 'OF' a 'AN' b" := (xor a b) (at level 60).
-Notation "'NOT' n" := (non n) (at level 59).
-Notation "'BOTH' 'SAEM' a 'AN' b" := (same a b) (at level 60).
-Notation "'DIFFRINT' a 'AN' b" := (diff a b) (at level 60).
+Notation "'BOTH' 'OF' a 'AN' b" := (and a b) (at level 49).
+Notation "'EITHER' 'OF' a 'AN' b" := (or a b) (at level 49).
+Notation "'WON' 'OF' a 'AN' b" := (xor a b) (at level 49).
+Notation "'NOT' n" := (non n) (at level 49).
+Notation "'BOTH' 'SAEM' a 'AN' b" := (same a b) (at level 49).
+Notation "'DIFFRINT' a 'AN' b" := (diff a b) (at level 49).
 Notation "'DIFFRINT' 'AN' 'BIGGR' 'OF' a 'AN' b" := (lt a b) (at level 53).
 Notation "'DIFFRINT' 'AN' 'SMALLR' 'OF' a 'AN' b" := (gt a b) (at level 53).
 Notation "'BOTH' 'SAEM' 'AN' 'BIGGR' 'OF' a 'AN' b" := (geq a b) (at level 53).
@@ -516,6 +549,37 @@ Inductive boolBS : BExp -> Env -> ErrorBool -> Prop :=
     scomp s1 s2 ={ sg }=> r
 where "B ={ S }=> B'" := (boolBS B S B').
 
+Example ex5 : NOT true ={ env_notdecl }=> false.
+Proof.
+  eapply notBS.
+  eapply bconstantBS.
+  simpl. reflexivity.
+Qed.
+
+Example ex6 : BOTH OF true AN false ={ env_notdecl }=> false.
+Proof.
+  eapply andBS.
+  eapply bconstantBS.
+  eapply bconstantBS.
+  simpl. reflexivity.
+Qed.
+
+Example ex7 : DIFFRINT AN BIGGR OF 7 AN 10 ={ env_notdecl }=> true.
+Proof.
+  eapply lessthanBS.
+  eapply constantBS.
+  eapply constantBS.
+  simpl. reflexivity.
+Qed.
+
+Example ex8 : COMP "sb" WIT "tf" ={ env_notdecl }=> true.
+Proof.
+  eapply cmpBS.
+  eapply sconstantBS.
+  eapply sconstantBS.
+  simpl. 
+Abort.
+
 
 Inductive VExp :=
 | error_vector : VExp
@@ -535,7 +599,7 @@ Inductive Stmt :=
 | seqinflow : Stmt -> Stmt -> Stmt
 | ifthen : BExp -> Stmt -> Stmt
 | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
-| while : BExp -> Stmt -> Stmt
+| whileseq : BExp -> Stmt -> Stmt
 | forsq_any : Stmt -> Stmt -> BExp -> Stmt -> Stmt
 | break : Stmt
 | continue : Stmt
@@ -546,26 +610,28 @@ with Cases :=
     | default_case : Stmt -> Cases.
 
 (* notations for flow controls *)
-Notation " a 'ITZ' b" := (equals_Z a b) (at level 90).
-Notation " a 'ITZB' b" := (equals_bool a b) (at level 90).
-Notation " a 'ITS' b" := (equals_string a b) (at level 90).
-Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_vectZ a (vector_int n nil)) (at level 90).
-Notation " 'I' 'HAS' 'A' 'NUMBR' a" := (decl_Z a) (at level 90).
-Notation " 'I' 'HAS' 'A' 'TROOF' a" := (decl_bool a) (at level 90).
-Notation " 'I' 'HAS' 'A' 'YARN' a" := (decl_string a) (at level 90).
-
-Notation "a 'AN' b" := (seqinflow a b)(at level 90). (*pentru secventele folosite in partea de conditional*)
-Notation "a ; b" := (seqinflow a b) (at level 91).
+Notation "a 'AND' b" := (seqinflow a b)(at level 90). (*pentru secventele folosite in partea de conditional*)
+Notation "a ; b" := (seqinflow a b) (at level 90).
 Notation "'BTW' comm" := (comment comm) (at level 90).
 Notation "'OBTW' comm 'TLDR'" := (comment comm) (at level 90).
 
 
-Notation " cond 'O' 'RLY?' 'YA' 'RLY' s1 'NO' 'WAI' s2 'OIC'" := (ifthenelse cond s1 s2) (at level 95).
-Notation " cond 'O' 'RLY?' 'YA' 'RLY' s 'OIC'" := (ifthen cond s) (at level 95).
-Notation " 'IM' 'IN' 'YR' 'WHILE' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (while cond s) (at level 95).
-Notation " 'IM' 'IN' 'YR' 'LOOP' oper 'YR' a 'TIL' cond s 'IM' 'OUTTA' 'YR' 'LOOP'" := (forsq_any oper a cond s) (at level 95).
-Notation "'ENUF'" := (break) (at level 90).
-Notation "'GOON'" := (continue) (at level 90).
+Notation " a 'ITZ' b" := (equals_Z a b) (at level 50).
+Notation " a 'ITZB' b" := (equals_bool a b) (at level 50).
+Notation " a 'ITS' b" := (equals_string a b) (at level 50).
+Notation " 'I' 'HAS' 'A' 'ANUMBR' a [ n ] " := (decl_vectZ a (vector_int n nil)) (at level 80).
+Notation " 'I' 'HAS' 'A' 'NUMBR' a" := (decl_Z a) (at level 80).
+Notation " 'I' 'HAS' 'A' 'TROOF' a" := (decl_bool a) (at level 80).
+Notation " 'I' 'HAS' 'A' 'YARN' a" := (decl_string a) (at level 80).
+
+
+
+Notation " cond 'O_RLY?' 'YA_RLY' { s1 } 'NO_WAI' { s2 } 'OIC'" := (ifthenelse cond s1 s2) (at level 95).
+Notation " cond 'O_RLY?' 'YA_RLY' { s } 'OIC'" := (ifthen cond s) (at level 95).
+Notation " 'IM_IN_YR_WHILE' cond s 'IM_OUTTA_YR_WHILE'" := (whileseq cond s) (at level 95).
+Notation " 'IM_IN_YR_LOOP' oper 'YR' a 'WILE' cond { s } 'IM_OUTTA_YR_LOOP'" := (forsq_any oper a cond s) (at level 95).
+Notation "'ENUF'" := (break) (at level 80).
+Notation "'GOON'" := (continue) (at level 80).
 
 Check (I HAS A NUMBR "a" ; "a" ITZ 12).
 Check (I HAS A ANUMBR "a" [30]).
@@ -573,9 +639,9 @@ Check (I HAS A TROOF "b" ; "b" ITZB false).
 Check ( "c" ITS "ff").
 
 (* notatii pentru functia switch() *)
-Notation "var ', WTF?' C1 .. Cn 'OIC'" := (switch var (cons C1 .. (cons Cn nil) .. )) (at level 97).
-Notation "'OMG' val seq" := (case_nr val seq) (at level 97).
-Notation "'OMGWTF' seq" := (default_case seq) (at level 97).
+Notation "var ',WTF?' C1 ;; C2 ;; .. ;; Cn 'OIC'" := (switch var (cons C1 (cons C2 .. (cons Cn nil) .. ))) (at level 99).
+Notation "'OMG' val { seq }" := (case_nr val seq) (at level 99).
+Notation "'OMGWTF' { seq }" := (default_case seq) (at level 99).
 
 (* input-output functions *)
 Inductive InAndOut :=
@@ -586,7 +652,7 @@ Notation "'GIMMEH' var" := (scan var)(at level 91).
 Notation "'VISIBLE' var" := (write var)(at level 91).
 
 
-Reserved Notation "S -{ sg }-> sg'" (at level 60).
+Reserved Notation "S -{ sg }-> sg'" (at level 75).
 Inductive strBS : Stmt -> Env -> Env -> Prop :=
 | decl_ZBS : forall i x sg sg',
     sg' = (update sg x (numbr_e i)) ->
@@ -605,7 +671,7 @@ Inductive strBS : Stmt -> Env -> Env -> Prop :=
     a ={ sg }=> i ->
     sg' = (update sg x (troof_e i)) ->
     equals_bool x a -{ sg }-> sg'
-| equalZBS : forall a i x sg sg',
+| equal_stringBS : forall a i x sg sg',
     sg' = (update sg x (strng_e i)) ->
     equals_string x a -{ sg }-> sg'
 | seqBS : forall s1 s2 sg sg1 sg2,
@@ -629,14 +695,14 @@ Inductive strBS : Stmt -> Env -> Env -> Prop :=
     ifthen cond s -{ sg }-> sg'
 | whilefalseBS : forall b s sg,
     b ={ sg }=> false ->
-    while b s -{ sg }-> sg
+    whileseq b s -{ sg }-> sg
 | whiletrueBS : forall b s sg sg',
     b ={ sg }=> true ->
-    (s ; while b s) -{ sg }-> sg' ->
-    while b s -{ sg }-> sg'
+    (s ; whileseq b s) -{ sg }-> sg' ->
+    whileseq b s -{ sg }-> sg'
 | forany_trueBS : forall init cond op s sg sg',
     cond ={ sg }=> true ->
-    ( init ; while cond (s ; op) ) -{ sg }-> sg' ->
+    ( init ; whileseq cond (s ; op) ) -{ sg }-> sg' ->
     forsq_any op init cond s -{ sg }-> sg'
 | forany_falseBS : forall init cond op s sg sg',
     cond ={ sg }=> false ->
@@ -651,24 +717,44 @@ Inductive strBS : Stmt -> Env -> Env -> Prop :=
     switch a s -{ sg }-> sg'
 where "s -{ sg }-> sg'" := (strBS s sg sg').
 
+Check (SUM OF "VAR" AN 1).
 
-(* Check (SUM OF "VAR" AN 1).
+Check(same "ANIMAL" "CAT")
+  O_RLY?
+    YA_RLY 
+    { "CAT" ITS "ok" }
+  OIC.
+
+Check I HAS A NUMBR "A"; "A" ITZ 0 ; 
+  whileseq (BOTH SAEM "A" AN 8)  
+  ("A" ITZ SUM OF "A" AN 2 ) .
+
+Check I HAS A NUMBR "B" ; "B" ITZ 1 ;
+  forsq_any ("i" ITZ SUM OF "i" AN 1) ("i" ITZ 1) (BOTH SAEM "i" AN 4)
+  ("B" ITZ PRODUKT OF "B" AN 2).
+
+Check BTW "notatie".
+Check OBTW "alta notatie" TLDR.
+
+(* Check switch "var"
+      case_nr 3 "a" ITZ 0
+      case_nr 2 "a" ITZ 1
+      .
  *)
- Check(BOTH SAEM "ANIMAL" AN "CAT"
-  O RLY?
-    YA RLY 
-    VISIBLE "J00 HAV A CAT"
-  OIC).
- 
-Check ( I HAS A NUMBR "a"; "a" ITZ 0 ; 
-IM IN YR LOOP (SUM OF "a" AN 1) YR "a" TIL (BOTH SAEM "a" AN 8) 
-  SUM OF "a" AN 3
-IM OUTTA YR LOOP
-        ).
 
-Check ( I HAS A NUMBR "a"; "a" ITZ 0 ; 
-IM IN YR WHILE (BOTH SAEM "a" AN 8) 
-  SUM OF "a" AN 2
-IM OUTTA YR WHILE
-        ).
+Compute (I HAS A NUMBR "n" ; "n" ITZ 4).
+
+Example ex8 : exists sg', ("n" ITZ 4 ; "n" ITZ 9) -{ env_notdecl }-> sg' /\ sg' "n" = numbr_e 9.
+Proof.
+  eexists.
+  split.
+  - eapply seqBS.
+    eapply equal_ZBS. eapply constantBS. reflexivity.
+    eapply equal_ZBS. eapply constantBS. reflexivity.
+  - unfold update. simpl. (* reflexivity. *)      
+Admitted.       
+    
+
+
+
 
