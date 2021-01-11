@@ -320,6 +320,14 @@ Proof.
   simpl. reflexivity.
 Qed.
 
+Example ex1' : DIFF OF 3 AN 5 =[ env_notdecl]=> error_Z.
+Proof.
+  eapply minusBS.
+  eapply constantBS.
+  eapply constantBS.
+  simpl. reflexivity.
+Qed.
+
 Example ex2 : MOD OF 12 AN 0 =[ env_notdecl ]=> error_Z.
 Proof.
   eapply modBS.
@@ -522,6 +530,16 @@ Inductive boolBS : BExp -> Env -> ErrorBool -> Prop :=
     b2 ={ sg }=> i2 ->
     b = (xor_err i1 i2) ->
     xor b1 b2 ={ sg }=> b
+| sameBS : forall sg b1 b2 i1 i2 b,
+    b1 =[ sg ]=> i1 ->
+    b2 =[ sg ]=> i2 ->
+    b = (same_err i1 i2) ->
+    same b1 b2 ={ sg }=> b
+| diffBS : forall sg b1 b2 i1 i2 b,
+    b1 =[ sg ]=> i1 ->
+    b2 =[ sg ]=> i2 ->
+    b = (diff_err i1 i2) ->
+    diff b1 b2 ={ sg }=> b
 | lessthanBS : forall a1 a2 i1 i2 sg r,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
@@ -536,7 +554,7 @@ Inductive boolBS : BExp -> Env -> ErrorBool -> Prop :=
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
     r = leq_err i1 i2 ->
-    lt a1 a2 ={ sg }=> r
+    leq a1 a2 ={ sg }=> r
 | greatereqBS : forall a1 a2 i1 i2 sg r,
     a1 =[ sg ]=> i1 ->
     a2 =[ sg ]=> i2 ->
@@ -730,7 +748,7 @@ Check I HAS A NUMBR "A"; "A" ITZ 0 ;
   ("A" ITZ SUM OF "A" AN 2 ) .
 
 Check I HAS A NUMBR "B" ; "B" ITZ 1 ;
-  forsq_any ("i" ITZ SUM OF "i" AN 1) ("i" ITZ 1) (BOTH SAEM "i" AN 4)
+  forsq_any ("i" ITZ SUM OF "i" AN 1) ("i" ITZ 1) (NOT BOTH SAEM "i" AN 4)
   ("B" ITZ PRODUKT OF "B" AN 2).
 
 Check BTW "notatie".
@@ -754,7 +772,179 @@ Proof.
   - unfold update. simpl. (* reflexivity. *)      
 Admitted.       
     
+Definition p1 := I HAS A NUMBR "x"; 
+                "x" ITZ 5;
+                whileseq (NOT BOTH SAEM "x" AN 10)
+                ("x" ITZ SUM OF "x" AN 1).
 
+Example ex9 : exists sg', p1 -{ env_notdecl }-> sg' /\ sg' "x" = numbr_e 10.
+Proof.
+  eexists.
+  split.
+  unfold p1.
+  eapply seqBS. eapply seqBS.
+  eapply decl_ZBS. eauto.
+  eapply equal_ZBS. eapply constantBS. reflexivity.
+  eapply whiletrueBS. eapply notBS. eapply sameBS. eapply identBS. eapply constantBS.
+  unfold update. simpl. reflexivity. simpl. (* eauto. *)
+Admitted.
+
+Definition p2 :=  I HAS A NUMBR "x";
+                  "x" ITZ 1;
+                  forsq_any ("i" ITZ SUM OF "i" AN 1) ("i" ITZ 1) (BOTH SAEM AN SMALLR OF "i" AN 5)
+                  ("x" ITZ PRODUKT OF "x" AN 2).
+
+Example ex10 : exists sg', p2 -{ env_notdecl }-> sg' /\ sg' "x" = numbr_e 32.
+Proof.
+  eexists.
+  split.
+  unfold p2.
+  eapply seqBS. eapply seqBS.
+  eapply decl_ZBS. eauto.
+  eapply equal_ZBS. eapply constantBS. reflexivity.
+  eapply forany_trueBS. eapply lesseqBS. eapply identBS. eapply constantBS.
+  simpl. (* eauto. *)
+Admitted.
+
+
+(* Defining a stack machine to create a compiler - not complete *)
+
+Inductive Var := string.
+Definition AEnv := Var -> Z.
+Definition Aenv0 := fun x => if string_dec x "x" then 10 else 0.
+Check Aenv0.
+
+Inductive AExp' :=
+| aconst' : Z -> AExp'
+| aid' : Var -> AExp'
+| plus' : AExp' -> AExp' -> AExp'
+| minus' : AExp' -> AExp' -> AExp'
+| multiply' : AExp' -> AExp' -> AExp'
+| divide' : AExp' -> AExp' -> AExp'.
+
+Fixpoint Ainterpret (e : AExp') (env : AEnv) : Z :=
+  match e with
+  | aconst' c => c
+  | aid' x => (env x)
+  | plus' e1 e2 => (Ainterpret e1 env) + (Ainterpret e2 env)
+  | multiply' e1 e2 => (Ainterpret e1 env) * (Ainterpret e2 env)
+  | minus' e1 e2 => (Ainterpret e1 env) - (Ainterpret e2 env)
+  | divide' e1 e2 => Z.div (Ainterpret e1 env) (Ainterpret e2 env)
+  end.
+
+
+Inductive Instr :=
+| push_const : Z -> Instr
+| push_var : Var -> Instr
+| plus_instr : Instr
+| mult_instr : Instr
+| diff_instr : Instr
+| divv_instr : Instr.
+
+Compute diff.
+
+
+Definition Stack := list Z.
+Fixpoint Arun_instruction (i : Instr)
+         (env : AEnv) (stack : Stack) : Stack :=
+  match i with
+  | push_const c => (c :: stack)
+  | push_var x => ((env x) :: stack)
+  | plus_instr => match stack with
+           | n1 :: n2 :: stack' => (n1 + n2) :: stack'
+           | _ => stack
+           end
+  | mult_instr => match stack with
+           | n1 :: n2 :: stack' => (n1 * n2) :: stack'
+           | _ => stack
+           end
+  | diff_instr => match stack with
+           | n1 :: n2 :: stack' => (n1 - n2) :: stack'
+           | _ => stack
+           end
+  | divv_instr => match stack with
+           | n1 :: n2 :: stack' => (Z.div n1 n2) :: stack'
+           | _ => stack
+           end
+  end.
+
+
+Fixpoint run_list (il : list Instr)
+         (env : Var -> Z) (stack : Stack) : Stack :=
+  match il with
+  | [ ] => stack
+  | i :: il' => run_list il' env (run_list i env stack)
+  end.
+
+Compute (Arun_instruction (push_const 93) env_notdecl []).
+Compute (Arun_instruction (push_var "x") env_notdecl []).
+
+Definition pgm1 := [ push_const 19 ; push_var "x" ].
+
+Compute run_instructions pgm1 env0 [].
+
+Fixpoint compile (e : AExp') : list Instr :=
+  match e with
+  | aconst' c => [push_const c]
+  | aid' x => [push_var x]
+  | plus' e1 e2 => (compile e1) ++ (compile e2) ++ [plus_instr]
+  | diff' e1 e2 => (compile e1) ++ (compile e2) ++ [minus_instr]
+  | multiply' e1 e2 => (compile e1) ++ (compile e2) ++ [multiply_instr]
+  | divide' e1 e2 => (compile e1) ++ (compile e2) ++ [divide_instr]
+  end.
+
+Compute compile (plus' 2 (id "x")).
+
+Compute interpret (plus' 2 (id "x") ) env_notdecl.
+Compute run_instructions (compile (plus' 2 (id "x") )) env_notdecl [].
+
+Lemma soundness_helper :
+    forall e env stack is',
+    run_list (compile e ++ is') env stack =
+    run_list is' env ((Ainterpret e env) :: stack).
+Proof.
+    induction e; intros; simpl; trivial.
+    - rewrite <- app_assoc.
+      rewrite <- app_assoc.
+      rewrite IHe1.
+      rewrite IHe2.
+      simpl.
+      rewrite Z.add_comm.
+      reflexivity.
+    - rewrite <- app_assoc.
+      rewrite <- app_assoc.
+      rewrite IHe1.
+      rewrite IHe2.
+      simpl.
+      rewrite Z.minus_comm.
+      reflexivity.
+    - rewrite <- app_assoc.
+      rewrite <- app_assoc.
+      rewrite IHe1.
+      rewrite IHe2.
+      simpl.
+      rewrite Z.multiply_comm.
+      reflexivity.
+    - rewrite <- app_assoc.
+      rewrite <- app_assoc.
+      rewrite IHe1.
+      rewrite IHe2.
+      simpl.
+      rewrite Z.div_comm.
+      reflexivity.
+Admitted.
+
+Theorem soundness :
+  forall e env,
+    run_list (compile e) env [] =
+    [Ainterpret e env].
+Proof.
+    intros.
+    Check app_nil_r.
+    rewrite <- app_nil_r with (l := (compile e)).
+    rewrite soundness_helper.
+    simpl. trivial.
+Qed.
 
 
 
